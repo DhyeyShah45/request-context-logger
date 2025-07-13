@@ -33,54 +33,23 @@ This document outlines the planned features and enhancements for the `context-lo
 
 ---
 
-## ✅ Recently Implemented
-
-### ❌ Error-specific Log Persistence
-
-**Implemented:**
-
-- Logs from requests that encounter an error (`statusCode >= 400` or `logger.error(...)` called) are now stored in a dedicated error log file (e.g., `/logs/errors/YYYY-MM-DD-error.log`).
-- A `--- End of Request ---` separator is added for better parsing.
-
-### ⏱️ Request Execution Time Logging
-
-**Implemented:**
-
-- Each request now logs execution duration in milliseconds.
-- Output appears in both console and file log.
-
-### 📄 Log Block Separation for File Storage
-
-**Implemented:**
-
-- `--- End of Request ---` added at the end of each request in both console and file output.
-
-### 📦 Optional Logging of Request Body and Response
-
-**Implemented:**
-
-- Config option to log `req.body` for POST, PUT, and PATCH methods.
-- Config option to log response body when response ends.
-
----
-
 ## 💡 Additional Features
 
-### 5. 🔁 Log Rotation & Storage Limits
+### 3. 🔁 Log Rotation & Storage Limits
 
 **Goal:** Avoid large log files; maintain log file health.
 
 - Use daily rotation
 - Max file size or count of entries
 
-### 6. 🧪 Built-in Testing Utilities
+### 4. 🧪 Built-in Testing Utilities
 
 **Goal:** Provide utilities to assert and inspect log output during tests.
 
 - `getBufferedLogs()`
 - `resetLogger()` for test isolation
 
-### 7. ⚙️ Configurable Log Levels by Environment
+### 5. ⚙️ Configurable Log Levels by Environment
 
 **Goal:** Change verbosity based on NODE_ENV or .env
 
@@ -88,7 +57,7 @@ This document outlines the planned features and enhancements for the `context-lo
 - Production: info, warn, error
 - Add `logger.setLevel()` dynamically
 
-### 8. 🧰 Framework Support
+### 6. 🧰 Framework Support
 
 **Goal:** Make `context-logger` work with:
 
@@ -96,32 +65,32 @@ This document outlines the planned features and enhancements for the `context-lo
 - Hapi
 - Koa
 
-### 9. 💬 Developer DX Layer
+### 7. 💬 Developer DX Layer
 
 **Goal:** Improve usability and reduce boilerplate
 
 - Provide wrapper like `log.info("msg")` without manually importing in each file
 - Config-based global logger proxy
 
-### 10. 📂 Metadata Extensibility
+### 8. 📂 Metadata Extensibility
 
 **Goal:** Allow users to attach custom fields like `userId`, `tenant`, etc.
 
 - Add `logger.attach({ userId: 123 })`
 - Include attached metadata in all subsequent logs
 
-### 11. 📦 CLI for Log Analysis (Stretch Goal)
+### 9. 📦 CLI for Log Analysis (Stretch Goal)
 
 **Goal:** Command-line tool to read, filter, and search logs easily.
 
-### 12. 🔍 Improved Object Logging & Real-time Output
+### 10. 📦 Optional Logging of Request Body and Response
 
-**Goal:** Log objects in a readable format and improve development visibility.
+**Goal:** Improve debug capability by optionally logging request payload and response body.
 
 **Approach:**
 
-- Use `util.inspect()` to log objects in development
-- Still buffer for file output, but print each line in real-time
+- If method is POST, PUT, or PATCH, allow showing `req.body`.
+- At end of response, show returned payload if enabled by user config.
 
 ---
 

@@ -1,6 +1,7 @@
 import kleur from "kleur";
 import fs from "fs";
 import path from "path";
+import util from "util";
 import type { Request as ExpressRequest } from "express";
 import type { IncomingMessage } from "http";
 
@@ -20,15 +21,38 @@ const colors: Record<LogLevel, (msg: string) => string> = {
   error: red,
 };
 
+function getRequestInfo(req?: ExpressRequest | IncomingMessage): {
+  method: string;
+  path: string;
+  ip: string;
+  sourceService: string;
+  meta: string;
+} {
+  const method = (req as any)?.method ?? "UNKNOWN";
+  const path = (req as any)?.originalUrl ?? "/";
+  const sourceService = (req as any)?.headers?.["x-source-service"] ?? "";
+  const ip =
+    (req as any)?.headers?.["x-forwarded-for"] ??
+    (req as any)?.socket?.remoteAddress ??
+    "-";
+  const meta = `${method} ${path} ${
+    sourceService ? `source=${sourceService}` : ""
+  } ip=${ip}`;
+
+  return { method, path, ip, sourceService, meta };
+}
+
 export class RequestLogger {
   private logs: string[] = [];
   private logFilePath: string;
+  private errorLogFilePath: string;
   private startTime: number = Date.now();
   private hasError: boolean = false;
+  private requestMeta: string;
 
   constructor(
     private requestId: string,
-    private req: ExpressRequest | IncomingMessage
+    private req?: ExpressRequest | IncomingMessage
   ) {
     // Store logs to `logs/YYYY-MM-DD.log`
     const date = new Date().toISOString().slice(0, 10);
@@ -39,46 +63,35 @@ export class RequestLogger {
     }
 
     this.logFilePath = path.join(logsDir, `${date}.log`);
+    this.errorLogFilePath = path.join(logsDir, `${date}-error.log`);
+
+    this.requestMeta = getRequestInfo(this.req).meta;
   }
 
-  private getRequestInfo(): {
-    method: string;
-    path: string;
-    ip: string;
-    sourceService: string;
-  } {
-    const method = (this.req as any)?.method ?? "UNKNOWN";
-    const path = (this.req as any)?.originalUrl ?? "/";
-    const sourceService =
-      (this.req as any)?.headers?.["x-source-service"] ?? "";
-    const ip =
-      (this.req as any)?.headers?.["x-forwarded-for"] ??
-      (this.req as any)?.socket?.remoteAddress ??
-      "-";
-
-    return { method, path, ip, sourceService };
+  private formatMessage(msg: unknown): string {
+    // Use util.inspect for better dev output (colors/objects)
+    if (typeof msg === "object") {
+      return util.inspect(msg, { colors: false, depth: 5, compact: false });
+    }
+    return String(msg);
   }
 
-  private write(level: LogLevel, msg: string) {
+  private write(level: LogLevel, msg: unknown) {
     const time = new Date().toISOString();
     // const icon = icons[level];
     const color = colors[level];
 
-    const { method, path, ip, sourceService } = this.getRequestInfo();
     if (level === "error") {
       this.hasError = true;
     }
 
-    const headerInfo = `${method} ${path} ${
-      sourceService ? `source=${sourceService}` : ""
-    } ip=${ip}`;
-
     const prefix = `[${time}] [${level.toUpperCase()}] [${this.requestId}]`;
+    const messageStr = this.formatMessage(msg);
 
-    const consoleFormatted = `${color(prefix)} ${color(
-      headerInfo
-    )}\n  ${kleur.white(msg)}`;
-    const fileFormatted = `${prefix} ${headerInfo}\n  ${msg}`;
+    const consoleFormatted = `${color(prefix)} ${gray(
+      this.requestMeta
+    )}\n  ${white(messageStr)}`;
+    const fileFormatted = `${prefix} ${this.requestMeta}\n  ${messageStr}`;
 
     // Print to console immediately
     console.log(consoleFormatted);
@@ -86,55 +99,41 @@ export class RequestLogger {
     this.logs.push(fileFormatted);
   }
 
-  info(msg: string) {
+  info(msg: unknown) {
     this.write("info", msg);
   }
 
-  warn(msg: string) {
+  warn(msg: unknown) {
     this.write("warn", msg);
   }
 
-  error(msg: string) {
+  error(msg: unknown) {
     this.write("error", msg);
   }
 
   flush() {
     if (this.logs.length === 0) return;
+
     const duration = Date.now() - this.startTime;
-
-    const { method, path: reqPath, ip, sourceService } = this.getRequestInfo();
-    const summaryLine = `[${new Date().toISOString()}] [SUMMARY] [${
+    const summary = `[${new Date().toISOString()}] [DONE] [${
       this.requestId
-    }] ${method} ${reqPath} ${
-      sourceService ? `source=${sourceService}` : ""
-    } ip=${ip}`;
-    const consoleSummary = gray(
-      `${summaryLine} - Request completed in ${duration}ms`
-    );
-    const fileSummary = `${summaryLine} - Request completed in ${duration}ms`;
+    }] Request completed in ${duration}ms`;
+    const endMarker = "--- End of Request ---";
 
-    this.logs.push(fileSummary);
-    this.logs.push(gray("--- End of Request ---"));
+    console.log(gray(summary));
+    console.log(gray(endMarker));
 
-    console.log(consoleSummary);
-    console.log(gray("--- End of Request ---"));
+    this.logs.push(summary);
+    this.logs.push(endMarker);
 
     const output = this.logs.join("\n") + "\n";
 
-    // 1. Always write to main log
+    // Write to primary log file
     fs.appendFileSync(this.logFilePath, output, { encoding: "utf8" });
 
-    // 2. If error, also write to error log file
+    // If error occurred, also write to error file
     if (this.hasError) {
-      const date = new Date().toISOString().slice(0, 10);
-      const errorLogDir = path.resolve("logs", "errors");
-
-      if (!fs.existsSync(errorLogDir)) {
-        fs.mkdirSync(errorLogDir, { recursive: true });
-      }
-
-      const errorLogPath = path.join(errorLogDir, `${date}-error.log`);
-      fs.appendFileSync(errorLogPath, output, { encoding: "utf8" });
+      fs.appendFileSync(this.errorLogFilePath, output, { encoding: "utf8" });
     }
 
     this.logs = [];
