@@ -1,5 +1,5 @@
 {
-  "name": "context-logger",
+  "name": "request-context-logger",
   "version": "0.1.0",
   "description": "A request-scoped logger with AsyncLocalStorage for Express and beyond.",
   "type": "module",

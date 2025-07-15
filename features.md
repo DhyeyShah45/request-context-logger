@@ -1,6 +1,6 @@
 # 🚀 Context Logger: Feature Roadmap
 
-This document outlines the planned features and enhancements for the `context-logger` package to make it robust, production-ready, and developer-friendly.
+This document outlines the planned features and enhancements for the `request-context-logger` package to make it robust, production-ready, and developer-friendly.
 
 ---
 
@@ -8,7 +8,7 @@ This document outlines the planned features and enhancements for the `context-lo
 
 ### 1. 🔗 Direct Integration with External Logging Tools
 
-**Goal:** Allow users to configure `context-logger` to forward logs to services like:
+**Goal:** Allow users to configure `request-context-logger` to forward logs to services like:
 
 - Loki / Grafana
 - Logtail
@@ -59,7 +59,7 @@ This document outlines the planned features and enhancements for the `context-lo
 
 ### 6. 🧰 Framework Support
 
-**Goal:** Make `context-logger` work with:
+**Goal:** Make `request-context-logger` work with:
 
 - Fastify
 - Hapi
@@ -97,7 +97,7 @@ This document outlines the planned features and enhancements for the `context-lo
 ## 🛠 Config Example (Coming Soon)
 
 ```ts
-import { configureLogger } from "context-logger";
+import { configureLogger } from "request-context-logger";
 
 configureLogger({
   level: process.env.NODE_ENV === "production" ? "info" : "debug",
