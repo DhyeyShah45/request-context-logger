@@ -68,15 +68,28 @@ export class RequestLogger {
     this.requestMeta = getRequestInfo(this.req).meta;
   }
 
-  private formatMessage(msg: unknown): string {
+  private formatMessage(...args: unknown[]): string {
     // Use util.inspect for better dev output (colors/objects)
-    if (typeof msg === "object") {
-      return util.inspect(msg, { colors: false, depth: 5, compact: false });
-    }
-    return String(msg);
+    return args
+      .map((msg) => {
+        if (msg === null) return "null";
+        if (msg === undefined) return "undefined";
+        if (typeof msg === "symbol") return msg.toString();
+        if (typeof msg === "object") {
+          const ctor = msg.constructor?.name ?? "Object";
+          const inspected = util.inspect(msg, {
+            colors: false,
+            depth: 5,
+            compact: false,
+          });
+          return `[${ctor}] ${inspected}`;
+        }
+        return String(msg);
+      })
+      .join(" ");
   }
 
-  private write(level: LogLevel, msg: unknown) {
+  private write(level: LogLevel, ...msg: unknown[]) {
     const time = new Date().toISOString();
     // const icon = icons[level];
     const color = colors[level];
@@ -86,7 +99,7 @@ export class RequestLogger {
     }
 
     const prefix = `[${time}] [${level.toUpperCase()}] [${this.requestId}]`;
-    const messageStr = this.formatMessage(msg);
+    const messageStr = this.formatMessage(...msg);
 
     const consoleFormatted = `${color(prefix)} ${gray(
       this.requestMeta
@@ -99,16 +112,66 @@ export class RequestLogger {
     this.logs.push(fileFormatted);
   }
 
-  info(msg: unknown) {
-    this.write("info", msg);
+  private toOpenTelemetryFormat(
+    level: LogLevel,
+    message: unknown
+  ): Record<string, any> {
+    const now = new Date();
+    const { method, path, ip, sourceService } = getRequestInfo(this.req);
+
+    return {
+      timestamp: now.toISOString(),
+      severity_text: level.toUpperCase(),
+      body: this.formatMessage(message),
+      attributes: {
+        "service.name": "request-context-logger",
+        "request.id": this.requestId,
+        "http.method": method,
+        "http.target": path,
+        "net.peer.ip": ip,
+        "source.service": sourceService,
+        env: process.env.NODE_ENV || "development",
+      },
+    };
   }
 
-  warn(msg: unknown) {
-    this.write("warn", msg);
+  private async pushToLoki(level: LogLevel, message: string) {
+    const epochNano = `${Date.now()}000000`; // Convert ms to ns
+    const body = {
+      streams: [
+        {
+          stream: {
+            level,
+            app: "request-context-logger",
+            request_id: this.requestId,
+            env: process.env.NODE_ENV || "development",
+          },
+          values: [[epochNano, message]],
+        },
+      ],
+    };
+
+    const res = await fetch("http://localhost:3100/loki/api/v1/push", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok) {
+      console.error("Failed to push to Loki", await res.text());
+    }
   }
 
-  error(msg: unknown) {
-    this.write("error", msg);
+  info(...msg: unknown[]) {
+    this.write("info", ...msg);
+  }
+
+  warn(...msg: unknown[]) {
+    this.write("warn", ...msg);
+  }
+
+  error(...msg: unknown[]) {
+    this.write("error", ...msg);
   }
 
   flush() {
