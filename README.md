@@ -2,6 +2,22 @@
 
 A lightweight, extensible request logger for Node.js/Express applications. Tracks requests from start to end, providing structured logs, error tracking, and integration-ready output for observability platforms.
 
+## Why I built this
+
+Working on production Express services, I kept running into the 
+same problem: a log line deep inside a utility function had no 
+way to know which request triggered it — without manually passing 
+context through every function call.
+
+Node's AsyncLocalStorage solves this cleanly. This package wraps 
+it into a simple Express middleware — attach it once, and every 
+`logger.info()` call anywhere in that request's execution chain 
+automatically carries the request ID, method, path, and metadata. 
+No prop drilling, no context passing.
+
+Currently Express-only. The unique request ID it generates can 
+be forwarded via headers to downstream services if you're 
+building towards distributed tracing.
 ## Features
 
 - Per-request logging with unique request IDs
